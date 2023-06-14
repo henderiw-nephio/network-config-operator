@@ -1,0 +1,144 @@
+apiVersion: fn.kptgen.dev/v1alpha1
+kind: Pod
+metadata:
+  name: controller
+  annotations:
+    config.kubernetes.io/local-config: "true"
+  namespace: nephio-system
+spec:
+  type: deployment
+  replicas: 1
+  permissionRequests:
+    controller:
+      scope: cluster
+    target:
+      scope: cluster
+      permissions:
+      - apiGroups: ["*"]
+        resources: [secrets]
+        verbs: [get, list, watch]
+      - apiGroups: [inv.nephio.org]
+        resources: [targets]
+        verbs: [get, list, watch, update, patch, create, delete]
+      - apiGroups: [inv.nephio.org]
+        resources: [targets/status]
+        verbs: [get, list, watch, update, patch, create, delete]
+    network:
+      scope: cluster
+      permissions:
+      - apiGroups: [config.nephio.org]
+        resources: [networks]
+        verbs: [get, list, watch, update, patch, create, delete]
+      - apiGroups: [config.nephio.org]
+        resources: [networks/status]
+        verbs: [get, list, watch, update, patch, create, delete]
+    leader-election:
+      permissions:
+      - apiGroups: [""]
+        resources: [configmaps]
+        verbs: [get, list, watch, update, patch, create, delete]
+      - apiGroups: [coordination.k8s.io]
+        resources: [leases]
+        verbs: [get, list, watch, update, patch, create, delete]
+      - apiGroups: [""]
+        resources: [events]
+        verbs: [create, patch]
+  template:
+    spec:
+      containers:
+      - name: kube-rbac-proxy
+        image: gcr.io/kubebuilder/kube-rbac-proxy:v0.8.0
+        args:
+        - --secure-listen-address=0.0.0.0:8443
+        - --upstream=http://127.0.0.1:8080/
+        - --logtostderr=true
+        - --v=10
+        ports:
+        - containerPort: 8443
+          name: https
+      - name: controller
+        image: europe-docker.pkg.dev/srlinux/eu.gcr.io/network-config-operator:latest
+        command:
+        - /manager
+        args:
+        - --health-probe-bind-address=:8081
+        - --metrics-bind-address=127.0.0.1:8080
+        - --leader-elect
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8081
+          initialDelaySeconds: 15
+          periodSeconds: 20
+        readinessProbe:
+          httpGet:
+            path: /readyz
+            port: 8081
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        # TODO(user): Configure the resources accordingly based on the project requirements.
+        # More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
+        resources:
+          limits:
+            cpu: 500m
+            memory: 128Mi
+          requests:
+            cpu: 10m
+            memory: 64Mi
+        env:
+        - name: POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.namespace
+        - name: "POD_IP"
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: status.podIP
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.name
+        - name: "NODE_NAME"
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: spec.nodeName
+        - name: "NODE_IP"
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: status.hostIP
+        #- name: GIT_SECRET_NAME
+        #  value: git-user-secret
+        - name: GIT_URL
+          value: http://172.18.0.200:3000
+        - name: GIT_NAMESPACE
+          value: gitea
+        - name: ENABLE_REPOSITORIES
+          value: "true"
+        - name: ENABLE_TOKENS
+          value: "true"
+        - name: ENABLE_BOOTSTRAPSECRETS
+          value: "true"
+        - name: ENABLE_BOOTSTRAPPACKAGES
+          value: "true"
+        - name: ENABLE_NETWORKS
+          value: "true"
+        - name: ENABLE_TARGETS
+          value: "true"
+        - name: ENABLE_NETWORKCONFIGS
+          value: "true"
+        #- name: ENABLE_VLANSPECIALIZER
+        #  value: "false"
+        #- name: ENABLE_IPAMSPECIALIZER
+        #  value: "false"
+        - name: ENABLE_GENERICSPECIALIZER
+          value: "true"
