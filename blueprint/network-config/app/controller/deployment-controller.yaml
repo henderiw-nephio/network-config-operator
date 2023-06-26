@@ -4,7 +4,7 @@ metadata:
   annotations: {}
   creationTimestamp: null
   name: network-config-controller
-  namespace: nephio-system
+  namespace: network-config
 spec:
   replicas: 1
   selector:
@@ -23,7 +23,7 @@ spec:
         app.kubernetes.io/version: tbd
         fn.kptgen.dev/controller: network-config-controller
       name: network-config-controller
-      namespace: nephio-system
+      namespace: network-config
     spec:
       containers:
       - args:

@@ -11,7 +11,7 @@ metadata:
     app.kubernetes.io/part-of: network-config
     app.kubernetes.io/version: tbd
   name: network-config-controller-leader-election-role
-  namespace: nephio-system
+  namespace: network-config
 rules:
 - apiGroups:
   - ""
